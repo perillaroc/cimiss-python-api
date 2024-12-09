@@ -8,7 +8,7 @@ from nuwe_cmadaas.util import (
     get_time_range_string,
     get_region_params,
 )
-from nuwe_cmadaas.music import MusicError, FileInfo, get_or_create_client, CMADaaSClient
+from nuwe_cmadaas.music import MusicError, get_or_create_client, CMADaaSClient
 from nuwe_cmadaas.config import CMADaasConfig
 from nuwe_cmadaas._log import logger
 
@@ -24,14 +24,14 @@ class InterfaceConfig(TypedDict):
 
 def download_model_file(
         data_code: str,
-        parameter: Union[str, List[str]] = None,
-        start_time: Union[pd.Interval, pd.Timestamp, List, pd.Timedelta] = None,
-        forecast_time: Union[str, pd.Timedelta] = None,
-        level_type: Union[str, int] = None,
-        level: Union[int, float] = None,
-        region: Dict = None,
-        data_type: str = None,
-        output_dir: Union[Path, str] = None,
+        parameter: Optional[Union[str, List[str]]] = None,
+        start_time: Optional[Union[pd.Interval, pd.Timestamp, List, pd.Timedelta]] = None,
+        forecast_time: Optional[Union[str, pd.Timedelta]] = None,
+        level_type: Optional[Union[str, int]] = None,
+        level: Optional[Union[int, float]] = None,
+        region: Optional[Dict] = None,
+        data_type: Optional[str] = None,
+        output_dir: Optional[Union[Path, str]] = None,
         config: Optional[Union[CMADaasConfig, str, Path]] = None,
         client: Optional[CMADaaSClient] = None,
 ) -> Union[List[Path], MusicError]:
@@ -87,11 +87,17 @@ def download_model_file(
         del params["elements"]
 
     if forecast_time is not None:
-        interface_config["valid_time"] = "Validtime"
         if isinstance(forecast_time, str):
             forecast_time = pd.to_timedelta(forecast_time)
         valid_time = int(forecast_time / pd.Timedelta(hours=1))
-        params["validTime"] = str(valid_time)
+        if parameter is None and level_type is None and level is None:
+            # Typically for NWP files which all fields of one time step are stored together.
+            # There is no getNafpFileByTimeAndValidtime interface.
+            # So use getNafpFileByTime instead, and set valid time condition in eleValueRanges.
+            params["eleValueRanges"] = f"Validtime_C:'{valid_time:03d}'"
+        else:
+            interface_config["valid_time"] = "Validtime"
+            params["validTime"] = str(valid_time)
 
     if region is not None:
         get_region_params(region, params, interface_config)
@@ -134,7 +140,7 @@ def _get_interface_id(interface_config: InterfaceConfig) -> str:
     return _fix_interface_id(interface_id)
 
 
-def _fix_interface_id(interface_id):
+def _fix_interface_id(interface_id: str) -> str:
     fix_mapper = {
         "getNafpFileByElementAndTimeRangeAndLevel": "getNafpFileByElementAndTimeRange",
         "getNafpFileByElementAndTimeAndLevel": "getNafpFileByElementAndTime",

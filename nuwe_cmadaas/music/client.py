@@ -279,7 +279,9 @@ class CMADaaSClient:
             if files_info.request.error_code != 0:
                 return files_info
 
-            for file_info in files_info.files_info:
+            total_count = len(files_info.files_info)
+            for index, file_info in enumerate(files_info.files_info):
+                logger.info(f"downloading file {index + 1}/{total_count}...")
                 result = self._connection.download_file(
                     file_info.file_url, file_dir_path.joinpath(file_info.file_name)
                 )
@@ -287,6 +289,7 @@ class CMADaaSClient:
                     files_info.request.errorCode = result[0]
                     files_info.request.errorMessage = result[1]
                     return files_info
+                logger.info(f"downloading file {index + 1}/{total_count}...done")
 
             return files_info
 
